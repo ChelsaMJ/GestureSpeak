@@ -238,56 +238,8 @@
         <div class="card-header">
           <h3><i data-lucide="book-open"></i> Gesture Dictionary</h3>
         </div>
-        <div class="cheatsheet-grid">
-          <div class="cheat-item glass" data-gesture="open_hand">
-            <div class="cheat-emoji">🖐️</div>
-            <div class="cheat-details">
-              <h4>Open Hand</h4>
-              <p>"Hello / Welcome"</p>
-            </div>
-          </div>
-          <div class="cheat-item glass" data-gesture="thumbs_up">
-            <div class="cheat-emoji">👍</div>
-            <div class="cheat-details">
-              <h4>Thumbs Up</h4>
-              <p>"Yes / Agree / Good"</p>
-            </div>
-          </div>
-          <div class="cheat-item glass" data-gesture="thumbs_down">
-            <div class="cheat-emoji">👎</div>
-            <div class="cheat-details">
-              <h4>Thumbs Down</h4>
-              <p>"No / Disagree / Bad"</p>
-            </div>
-          </div>
-          <div class="cheat-item glass" data-gesture="peace_sign">
-            <div class="cheat-emoji">✌️</div>
-            <div class="cheat-details">
-              <h4>Peace Sign</h4>
-              <p>"Peace / Victory"</p>
-            </div>
-          </div>
-          <div class="cheat-item glass" data-gesture="fist">
-            <div class="cheat-emoji">✊</div>
-            <div class="cheat-details">
-              <h4>Fist</h4>
-              <p>"Stop / Hold on"</p>
-            </div>
-          </div>
-          <div class="cheat-item glass" data-gesture="rock_on">
-            <div class="cheat-emoji">🤘</div>
-            <div class="cheat-details">
-              <h4>Rock On</h4>
-              <p>"Awesome / Rock"</p>
-            </div>
-          </div>
-          <div class="cheat-item glass" data-gesture="pointing_up">
-            <div class="cheat-emoji">☝️</div>
-            <div class="cheat-details">
-              <h4>Pointing Up</h4>
-              <p>"Look / Question"</p>
-            </div>
-          </div>
+        <div class="cheatsheet-grid" id="cheatsheet-grid">
+          <!-- Dynamically populated via javascript -->
         </div>
       </section>
 
@@ -361,6 +313,26 @@
             </div>
             <button id="btn-reset-vocab" class="btn danger-btn" style="padding: 10px; width: 100%; font-size: 0.8rem;">
               <i data-lucide="refresh-cw"></i> Reset to Defaults
+            </button>
+          </div>
+        </div>
+
+        <!-- Gesture Recorder -->
+        <div class="settings-section">
+          <h4><i data-lucide="video"></i> Gesture Recorder</h4>
+          <div class="recorder-preview glass" style="padding: 10px; margin-top: 10px; text-align: center; font-size: 0.85rem;">
+            <div style="font-weight: 600; color: var(--accent-cyan); margin-bottom: 5px;">Live Hand Signal:</div>
+            <div id="live-pattern-display" style="font-family: monospace; font-size: 1.25rem; letter-spacing: 2px; color: var(--text-white); font-weight: 700;">No Hand</div>
+            <div id="live-pattern-details" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">Hold hand up to preview pattern</div>
+          </div>
+          <div class="vocab-btn-group" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+            <div style="display: flex; gap: 6px;">
+              <input type="text" id="input-new-emoji" class="glass-input" style="width: 50px; text-align: center; font-size: 1.2rem; padding: 6px;" placeholder="🆕" value="🆕">
+              <input type="text" id="input-new-label" class="glass-input" style="flex: 1; padding: 6px; font-size: 0.8rem;" placeholder="Gesture Label (e.g. Call Me)">
+            </div>
+            <input type="text" id="input-new-phrase" class="glass-input" style="width: 100%; padding: 6px; font-size: 0.8rem;" placeholder="Translated Phrase (e.g. Call)">
+            <button id="btn-register-gesture" class="btn secondary-btn" style="padding: 10px; width: 100%; font-size: 0.8rem; background: rgba(6, 182, 212, 0.1); border-color: rgba(6, 182, 212, 0.2); color: var(--accent-cyan);">
+              <i data-lucide="plus-circle"></i> Register Live Gesture
             </button>
           </div>
         </div>

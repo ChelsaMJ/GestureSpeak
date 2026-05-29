@@ -1274,3 +1274,29 @@ input[type=range]::-webkit-slider-thumb:hover {
   border-bottom-color: var(--accent-cyan);
 }
 
+/* Glass Inputs */
+.glass-input {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  color: var(--text-white);
+  padding: 8px 12px;
+  outline: none;
+  font-family: var(--font-body);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.glass-input:focus {
+  border-color: var(--accent-indigo);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Recorder Preview */
+.recorder-preview {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  margin-top: 10px;
+}
+
+

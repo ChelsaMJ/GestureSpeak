@@ -1,29 +1,41 @@
 // GestureSpeak Core Application Logic
 
-// Baseline Default Mappings
+// Baseline Default Mappings with Hand Patterns
+// Pattern format: [Thumb, Index, Middle, Ring, Pinky] (1 = extended, 0 = folded, x = don't care)
 const DEFAULT_GESTURE_MAP = {
-  open_hand: { label: 'Hello / Welcome', emoji: '🖐️', phrase: 'Hello' },
-  thumbs_up: { label: 'Yes / Agree / Good', emoji: '👍', phrase: 'Yes' },
-  thumbs_down: { label: 'No / Disagree / Bad', emoji: '👎', phrase: 'No' },
-  peace_sign: { label: 'Peace / Victory', emoji: '✌️', phrase: 'Peace' },
-  fist: { label: 'Stop / Hold on', emoji: '✊', phrase: 'Stop' },
-  rock_on: { label: 'Awesome / Rock', emoji: '🤘', phrase: 'Awesome' },
-  pointing_up: { label: 'Look / Question', emoji: '☝️', phrase: 'Look' }
+  open_hand: { label: 'Open Hand', emoji: '🖐️', phrase: 'Hello', pattern: 'x1111', isDefault: true },
+  thumbs_up: { label: 'Thumbs Up', emoji: '👍', phrase: 'Yes', pattern: '10000', isDefault: true },
+  thumbs_down: { label: 'Thumbs Down', emoji: '👎', phrase: 'No', pattern: '10000', isDefault: true },
+  peace_sign: { label: 'Peace Sign', emoji: '✌️', phrase: 'Peace', pattern: 'x1100', isDefault: true },
+  fist: { label: 'Fist', emoji: '✊', phrase: 'Stop', pattern: '00000', isDefault: true },
+  rock_on: { label: 'Rock On', emoji: '🤘', phrase: 'Awesome', pattern: 'x1001', isDefault: true },
+  pointing_up: { label: 'Pointing Up', emoji: '☝️', phrase: 'Look', pattern: 'x1000', isDefault: true }
 };
 
 // Active Mappings (Loaded dynamically)
 let GESTURE_MAP = JSON.parse(JSON.stringify(DEFAULT_GESTURE_MAP));
 
 function loadGestureMap() {
+  GESTURE_MAP = JSON.parse(JSON.stringify(DEFAULT_GESTURE_MAP));
   const stored = localStorage.getItem('gesture_speak_map');
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
       // Merge values to ensure schema compatibility
-      for (let key in DEFAULT_GESTURE_MAP) {
+      for (let key in parsed) {
         if (parsed[key] && typeof parsed[key].phrase === 'string') {
-          GESTURE_MAP[key].phrase = parsed[key].phrase;
-          GESTURE_MAP[key].label = parsed[key].label || DEFAULT_GESTURE_MAP[key].label;
+          if (DEFAULT_GESTURE_MAP.hasOwnProperty(key)) {
+            GESTURE_MAP[key].phrase = parsed[key].phrase;
+            GESTURE_MAP[key].label = parsed[key].label || DEFAULT_GESTURE_MAP[key].label;
+          } else if (key.startsWith('custom_') && parsed[key].pattern) {
+            GESTURE_MAP[key] = {
+              label: parsed[key].label || 'Custom Gesture',
+              emoji: parsed[key].emoji || '🆕',
+              phrase: parsed[key].phrase,
+              pattern: parsed[key].pattern,
+              isDefault: false
+            };
+          }
         }
       }
     } catch (e) {
@@ -32,6 +44,7 @@ function loadGestureMap() {
     }
   }
 }
+
 
 
 // NLP Sentiment Lexicon
@@ -160,6 +173,9 @@ let modelStatusDotEl, modelStatusTextEl, cameraStatusDotEl, cameraStatusTextEl, 
 // Vocabulary Customization DOM elements
 let vocabularyEditorEl, btnSaveVocabEl, btnExportVocabEl, btnImportVocabTriggerEl, fileImportVocabEl, btnResetVocabEl;
 
+// Gesture Recorder DOM elements
+let livePatternDisplayEl, livePatternDetailsEl, inputNewEmojiEl, inputNewLabelEl, inputNewPhraseEl, btnRegisterGestureEl, cheatsheetGridEl;
+
 // Document Ready Initialization
 document.addEventListener("DOMContentLoaded", () => {
   loadGestureMap();
@@ -244,6 +260,15 @@ function cacheDOM() {
   btnImportVocabTriggerEl = document.getElementById("btn-import-vocab-trigger");
   fileImportVocabEl = document.getElementById("file-import-vocab");
   btnResetVocabEl = document.getElementById("btn-reset-vocab");
+
+  // Gesture Recorder cache
+  livePatternDisplayEl = document.getElementById("live-pattern-display");
+  livePatternDetailsEl = document.getElementById("live-pattern-details");
+  inputNewEmojiEl = document.getElementById("input-new-emoji");
+  inputNewLabelEl = document.getElementById("input-new-label");
+  inputNewPhraseEl = document.getElementById("input-new-phrase");
+  btnRegisterGestureEl = document.getElementById("btn-register-gesture");
+  cheatsheetGridEl = document.getElementById("cheatsheet-grid");
 }
 
 
@@ -394,7 +419,14 @@ function bindUIEvents() {
     playSynthSound('click');
     const exportData = {};
     for (let key in GESTURE_MAP) {
-      exportData[key] = { phrase: GESTURE_MAP[key].phrase };
+      const item = GESTURE_MAP[key];
+      exportData[key] = {
+        phrase: item.phrase,
+        label: item.label,
+        emoji: item.emoji,
+        pattern: item.pattern,
+        isDefault: item.isDefault
+      };
     }
     const jsonStr = JSON.stringify(exportData, null, 2);
     const blob = new Blob([jsonStr], { type: "application/json" });
@@ -427,10 +459,25 @@ function bindUIEvents() {
       try {
         const parsed = JSON.parse(evt.target.result);
         let updated = false;
-        for (let key in DEFAULT_GESTURE_MAP) {
+        
+        // Temporarily reset to baseline, then merge parsed items
+        GESTURE_MAP = JSON.parse(JSON.stringify(DEFAULT_GESTURE_MAP));
+
+        for (let key in parsed) {
           if (parsed[key] && typeof parsed[key].phrase === 'string') {
-            GESTURE_MAP[key].phrase = parsed[key].phrase;
-            updated = true;
+            if (DEFAULT_GESTURE_MAP.hasOwnProperty(key)) {
+              GESTURE_MAP[key].phrase = parsed[key].phrase;
+              updated = true;
+            } else if (key.startsWith('custom_') && parsed[key].pattern) {
+              GESTURE_MAP[key] = {
+                label: parsed[key].label || 'Custom Gesture',
+                emoji: parsed[key].emoji || '🆕',
+                phrase: parsed[key].phrase,
+                pattern: parsed[key].pattern,
+                isDefault: false
+              };
+              updated = true;
+            }
           }
         }
         if (updated) {
@@ -450,6 +497,65 @@ function bindUIEvents() {
       fileImportVocabEl.value = '';
     };
     reader.readAsText(file);
+  });
+
+  // Bind custom gesture registration event
+  btnRegisterGestureEl.addEventListener("click", () => {
+    initAudio();
+    const pattern = livePatternDisplayEl.textContent;
+    if (pattern === "No Hand") {
+      showToast("Hold hand up to record shape", "error");
+      playSynthSound('click');
+      return;
+    }
+    const emoji = inputNewEmojiEl.value.trim() || '🆕';
+    const label = inputNewLabelEl.value.trim();
+    const phrase = inputNewPhraseEl.value.trim();
+
+    if (!label || !phrase) {
+      showToast("Fill in Label and Phrase fields", "error");
+      playSynthSound('click');
+      return;
+    }
+
+    // Verify if pattern matches an exact default gesture pattern
+    let conflict = false;
+    for (let key in DEFAULT_GESTURE_MAP) {
+      const def = DEFAULT_GESTURE_MAP[key];
+      // Default gestures like Open Hand or Peace Sign allow wildcard checks,
+      // but exact patterns like fist (00000) or thumbs up (10000) conflict.
+      if (def.pattern === pattern && def.isDefault) {
+        conflict = true;
+        break;
+      }
+    }
+    if (conflict) {
+      showToast("Shape reserved by default gesture", "error");
+      playSynthSound('click');
+      return;
+    }
+
+    // Register gesture (save key by custom pattern string)
+    const key = `custom_${pattern}`;
+    GESTURE_MAP[key] = {
+      label: label,
+      emoji: emoji,
+      phrase: phrase,
+      pattern: pattern,
+      isDefault: false
+    };
+
+    localStorage.setItem('gesture_speak_map', JSON.stringify(GESTURE_MAP));
+    renderVocabularyEditor();
+    renderCheatSheet();
+    
+    // Clear registration text fields
+    inputNewLabelEl.value = '';
+    inputNewPhraseEl.value = '';
+    
+    showToast("Gesture registered!", "success");
+    addLog(`Registered custom gesture "${label}" [${pattern}] for "${phrase}"`, "system");
+    playSynthSound('success');
   });
 }
 
@@ -651,14 +757,51 @@ function onHandResults(results) {
     // Draw Hand Mesh / Skeleton
     drawHandSkeleton(landmarks);
 
+    // Update live pattern editor displays
+    updateLivePatternDisplay(landmarks);
+
     // Classify Gesture
     const gesture = classifyGesture(landmarks);
     handleGestureMatching(gesture);
   } else {
     // No hand detected
+    updateLivePatternDisplay(null);
     handleGestureMatching(null);
   }
 }
+
+// Update the settings drawer recorder preview
+function updateLivePatternDisplay(landmarks) {
+  if (!livePatternDisplayEl || !livePatternDetailsEl) return;
+
+  if (landmarks) {
+    const state = getHandState(landmarks);
+    const pattern = (state.thumb ? '1' : '0') + 
+                    (state.index ? '1' : '0') + 
+                    (state.middle ? '1' : '0') + 
+                    (state.ring ? '1' : '0') + 
+                    (state.pinky ? '1' : '0');
+
+    livePatternDisplayEl.textContent = pattern;
+    livePatternDisplayEl.style.color = '#06b6d4'; // Cyan
+
+    const extended = [];
+    if (state.thumb) extended.push("Thumb");
+    if (state.index) extended.push("Index");
+    if (state.middle) extended.push("Middle");
+    if (state.ring) extended.push("Ring");
+    if (state.pinky) extended.push("Pinky");
+
+    livePatternDetailsEl.textContent = extended.length > 0 ? 
+      `Extended: ${extended.join(", ")}` : 
+      "All fingers folded (Fist)";
+  } else {
+    livePatternDisplayEl.textContent = "No Hand";
+    livePatternDisplayEl.style.color = '#64748b'; // Dimmed
+    livePatternDetailsEl.textContent = "Hold hand up to preview pattern";
+  }
+}
+
 
 // Draw futuristic skeleton mesh on canvas
 function drawHandSkeleton(landmarks) {
@@ -739,42 +882,47 @@ function getHandState(landmarks) {
 function classifyGesture(landmarks) {
   const state = getHandState(landmarks);
 
-  // 1. Open Hand (🖐️): All four finger extensions are active
-  if (state.index && state.middle && state.ring && state.pinky) {
-    return 'open_hand';
-  }
+  // 1. Generate 5-finger binary string pattern
+  const currentPattern = (state.thumb ? '1' : '0') + 
+                         (state.index ? '1' : '0') + 
+                         (state.middle ? '1' : '0') + 
+                         (state.ring ? '1' : '0') + 
+                         (state.pinky ? '1' : '0');
 
-  // 2. Peace Sign (✌️): Index & Middle extended, Ring & Pinky folded
-  if (state.index && state.middle && !state.ring && !state.pinky) {
-    return 'peace_sign';
-  }
-
-  // 3. Rock On (🤘): Index & Pinky extended, Middle & Ring folded
-  if (state.index && !state.middle && !state.ring && state.pinky) {
-    return 'rock_on';
-  }
-
-  // 4. Pointing Up (☝️): Only Index extended, others folded
-  if (state.index && !state.middle && !state.ring && !state.pinky) {
-    return 'pointing_up';
-  }
-
-  // 5. Thumbs Up / Down / Fist: all standard knuckles folded
-  if (!state.index && !state.middle && !state.ring && !state.pinky) {
-    if (state.thumb) {
-      // Analyze orientation: Thumbs Up has tip higher than knuckle, Thumbs Down is opposite
-      if (landmarks[4].y < landmarks[2].y) {
-        return 'thumbs_up';
+  // 2. Exact match check (Priority 1: custom gestures, fist, thumbs)
+  for (let key in GESTURE_MAP) {
+    const item = GESTURE_MAP[key];
+    if (item.pattern === currentPattern) {
+      if (key === 'thumbs_up') {
+        if (landmarks[4].y < landmarks[2].y) return 'thumbs_up';
+      } else if (key === 'thumbs_down') {
+        if (landmarks[4].y > landmarks[2].y) return 'thumbs_down';
       } else {
-        return 'thumbs_down';
+        return key;
       }
-    } else {
-      return 'fist';
+    }
+  }
+
+  // 3. Wildcard match check (Priority 2: defaults allowing thumb variation, e.g. x1111)
+  for (let key in GESTURE_MAP) {
+    const item = GESTURE_MAP[key];
+    if (item.pattern && item.pattern.includes('x')) {
+      let isMatch = true;
+      for (let i = 0; i < 5; i++) {
+        if (item.pattern[i] !== 'x' && currentPattern[i] !== item.pattern[i]) {
+          isMatch = false;
+          break;
+        }
+      }
+      if (isMatch) {
+        return key;
+      }
     }
   }
 
   return null;
 }
+
 
 // Logic coordinator for debounce locks & cooldown cycles
 function handleGestureMatching(gesture) {
