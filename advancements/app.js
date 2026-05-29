@@ -9,8 +9,10 @@ const DEFAULT_GESTURE_MAP = {
   peace_sign: { label: 'Peace Sign', emoji: '✌️', phrase: 'Peace', pattern: 'x1100', isDefault: true },
   fist: { label: 'Fist', emoji: '✊', phrase: 'Stop', pattern: '00000', isDefault: true },
   rock_on: { label: 'Rock On', emoji: '🤘', phrase: 'Awesome', pattern: 'x1001', isDefault: true },
-  pointing_up: { label: 'Pointing Up', emoji: '☝️', phrase: 'Look', pattern: 'x1000', isDefault: true }
+  pointing_up: { label: 'Pointing Up', emoji: '☝️', phrase: 'Look', pattern: 'x1000', isDefault: true },
+  pinch: { label: 'Pinch', emoji: '🤌', phrase: 'Wait', pattern: '11111', isDefault: true, special: 'pinch' }
 };
+
 
 // Active Mappings (Loaded dynamically)
 let GESTURE_MAP = JSON.parse(JSON.stringify(DEFAULT_GESTURE_MAP));
@@ -888,28 +890,43 @@ function getDistance(p1, p2) {
   );
 }
 
-// Geometric hand states classifier
+// Geometric hand states classifier (Rotation-tolerant)
 function getHandState(landmarks) {
-  // Determine if index, middle, ring, pinky fingers are extended
-  // Extended state criteria: tip is higher (smaller y-value) than PIP, which is higher than MCP
-  const indexExtended = landmarks[8].y < landmarks[6].y && landmarks[6].y < landmarks[5].y;
-  const middleExtended = landmarks[12].y < landmarks[10].y && landmarks[10].y < landmarks[9].y;
-  const ringExtended = landmarks[16].y < landmarks[14].y && landmarks[14].y < landmarks[13].y;
-  const pinkyExtended = landmarks[20].y < landmarks[18].y && landmarks[18].y < landmarks[17].y;
+  const wrist = landmarks[0];
 
-  // Determine if thumb is extended
-  // Standard metric: horizontal stretch. Calculate distance between thumb tip (4) and Index MCP (5).
-  // Stretch distance compared against thumb knuckle base MCP (2) to Index MCP (5).
-  const thumbTipIndexDist = getDistance(landmarks[4], landmarks[5]);
+  // We measure the Euclidean distance from each finger's tip to the wrist, 
+  // and compare it to the base knuckle joint (MCP) to the wrist.
+  // Extended fingers stretch significantly further away from the wrist than their base joints.
+  // This makes the check invariant to hand rotation.
+  const indexExtended = getDistance(landmarks[8], wrist) > getDistance(landmarks[5], wrist) * 1.15;
+  const middleExtended = getDistance(landmarks[12], wrist) > getDistance(landmarks[9], wrist) * 1.15;
+  const ringExtended = getDistance(landmarks[16], wrist) > getDistance(landmarks[13], wrist) * 1.15;
+  const pinkyExtended = getDistance(landmarks[20], wrist) > getDistance(landmarks[17], wrist) * 1.15;
+
+  // Thumb stretches horizontally. We check its tip (4) distance to the Index MCP base (5).
+  // When folded, the thumb tip is tucked in near the index MCP base.
   const thumbBaseIndexDist = getDistance(landmarks[2], landmarks[5]);
+  const thumbTipIndexDist = getDistance(landmarks[4], landmarks[5]);
   const thumbExtended = thumbTipIndexDist > thumbBaseIndexDist * 1.15;
+
+  // Spread check to distinguish Open Hand vs Pinch (🤌)
+  // We calculate average distance between adjacent finger tips (Index-Middle, Middle-Ring, Ring-Pinky)
+  // and compare it to the palm width (knuckles 5 to 17).
+  const spreadIdxMid = getDistance(landmarks[8], landmarks[12]);
+  const spreadMidRing = getDistance(landmarks[12], landmarks[16]);
+  const spreadRingPinky = getDistance(landmarks[16], landmarks[20]);
+  
+  const avgSpread = (spreadIdxMid + spreadMidRing + spreadRingPinky) / 3;
+  const palmWidth = getDistance(landmarks[5], landmarks[17]);
+  const isPinched = avgSpread < palmWidth * 0.32; // If tips converge tightly
 
   return {
     thumb: thumbExtended,
     index: indexExtended,
     middle: middleExtended,
     ring: ringExtended,
-    pinky: pinkyExtended
+    pinky: pinkyExtended,
+    isPinched: isPinched
   };
 }
 
@@ -923,10 +940,16 @@ function classifyGesture(landmarks) {
                          (state.ring ? '1' : '0') + 
                          (state.pinky ? '1' : '0');
 
+  // Special Check: Pinch (🤌)
+  // If all fingers are extended (pattern is 11111 or 01111) but they converge tightly, classify as Pinch
+  if ((currentPattern === '11111' || currentPattern === '01111') && state.isPinched) {
+    return 'pinch';
+  }
+
   // 2. Exact match check (Priority 1: custom gestures, fist, thumbs)
   for (let key in GESTURE_MAP) {
     const item = GESTURE_MAP[key];
-    if (item.pattern === currentPattern) {
+    if (item.pattern === currentPattern && key !== 'pinch') {
       if (key === 'thumbs_up') {
         if (landmarks[4].y < landmarks[2].y) return 'thumbs_up';
       } else if (key === 'thumbs_down') {
