@@ -566,12 +566,46 @@ function renderVocabularyEditor() {
     const item = GESTURE_MAP[key];
     const row = document.createElement("div");
     row.className = "vocab-row";
+    
+    // Add delete button if it's a custom gesture
+    const deleteBtn = !item.isDefault ? `
+      <button class="icon-btn-text btn-delete-custom" data-key="${key}" title="Delete Custom Gesture" style="padding: 4px; color: var(--neg-color); margin-left: 6px;">
+        <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
+      </button>
+    ` : '';
+
     row.innerHTML = `
       <span class="vocab-emoji" title="${item.label}">${item.emoji}</span>
       <input type="text" class="vocab-input" data-key="${key}" value="${item.phrase}" placeholder="Translation phrase...">
+      ${deleteBtn}
     `;
     vocabularyEditorEl.appendChild(row);
   }
+
+  // Bind custom delete buttons
+  const deleteButtons = vocabularyEditorEl.querySelectorAll(".btn-delete-custom");
+  deleteButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      initAudio();
+      playSynthSound('click');
+      const key = btn.getAttribute("data-key");
+      if (GESTURE_MAP[key]) {
+        const label = GESTURE_MAP[key].label;
+        delete GESTURE_MAP[key];
+        localStorage.setItem('gesture_speak_map', JSON.stringify(GESTURE_MAP));
+        
+        // Re-render components
+        renderVocabularyEditor();
+        renderCheatSheet();
+        
+        showToast("Gesture deleted", "error");
+        addLog(`Deleted custom gesture "${label}"`, "system");
+      }
+    });
+  });
+
+  // Re-initialize Lucide Icons inside the editor
+  initLucide();
 }
 
 function renderCheatSheet() {
