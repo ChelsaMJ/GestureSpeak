@@ -10,8 +10,10 @@ const DEFAULT_GESTURE_MAP = {
   fist: { label: 'Fist', emoji: '✊', phrase: 'Stop', pattern: '00000', isDefault: true },
   rock_on: { label: 'Rock On', emoji: '🤘', phrase: 'Awesome', pattern: 'x1001', isDefault: true },
   pointing_up: { label: 'Pointing Up', emoji: '☝️', phrase: 'Look', pattern: 'x1000', isDefault: true },
+  pointing_down: { label: 'Pointing Down', emoji: '👇', phrase: 'Down', pattern: 'x1000', isDefault: true },
   pinch: { label: 'Pinch', emoji: '🤌', phrase: 'Wait', pattern: '11111', isDefault: true, special: 'pinch' }
 };
+
 
 
 // Active Mappings (Loaded dynamically)
@@ -954,6 +956,10 @@ function classifyGesture(landmarks) {
         if (landmarks[4].y < landmarks[2].y) return 'thumbs_up';
       } else if (key === 'thumbs_down') {
         if (landmarks[4].y > landmarks[2].y) return 'thumbs_down';
+      } else if (key === 'pointing_up') {
+        if (landmarks[8].y < landmarks[5].y) return 'pointing_up';
+      } else if (key === 'pointing_down') {
+        if (landmarks[8].y > landmarks[5].y) return 'pointing_down';
       } else {
         return key;
       }
@@ -972,10 +978,17 @@ function classifyGesture(landmarks) {
         }
       }
       if (isMatch) {
-        return key;
+        if (key === 'pointing_up') {
+          if (landmarks[8].y < landmarks[5].y) return 'pointing_up';
+        } else if (key === 'pointing_down') {
+          if (landmarks[8].y > landmarks[5].y) return 'pointing_down';
+        } else {
+          return key;
+        }
       }
     }
   }
+
 
   return null;
 }
