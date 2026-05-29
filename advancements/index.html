@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GestureSpeak: Universal Gesture NLP Assistant</title>
+  <meta name="description" content="Translate universal hand gestures to speech, compile sentences, and analyze sentiment in real time.">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- MediaPipe CDNs -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <!-- Styling -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Background Blur Blobs -->
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+
+  <!-- Onboarding Splash Overlay -->
+  <div id="onboarding-overlay" class="overlay-container">
+    <div class="overlay-card glass">
+      <div class="logo-area">
+        <div class="logo-icon-glowing">
+          <i data-lucide="sparkles"></i>
+        </div>
+        <h1>Gesture<span>Speak</span></h1>
+        <p class="tagline">Universal Gesture NLP Assistant</p>
+      </div>
+
+      <div class="intro-text">
+        <p>Welcome to a touchless interaction experience. This assistant uses your webcam to detect hand gestures, translates them to words, compiles sentences, performs sentiment analysis, and reads them aloud.</p>
+      </div>
+
+      <div class="gesture-preview-list">
+        <div class="preview-item"><span>🖐️</span> Open Hand</div>
+        <div class="preview-item"><span>👍</span> Thumbs Up</div>
+        <div class="preview-item"><span>👎</span> Thumbs Down</div>
+        <div class="preview-item"><span>✌️</span> Peace Sign</div>
+        <div class="preview-item"><span>✊</span> Fist</div>
+        <div class="preview-item"><span>🤘</span> Rock On</div>
+        <div class="preview-item"><span>☝️</span> Pointing Up</div>
+      </div>
+
+      <div class="permissions-notice">
+        <i data-lucide="video"></i>
+        <span>Requires Camera permission & audio outputs enabled.</span>
+      </div>
+
+      <button id="btn-start" class="btn primary-btn btn-glowing">
+        <i data-lucide="power"></i> Initialize Engine
+      </button>
+    </div>
+  </div>
+
+  <!-- Main App Layout -->
+  <main class="app-container hidden">
+    <!-- Navbar / Header -->
+    <header class="app-header glass">
+      <div class="brand">
+        <i data-lucide="hand" class="brand-icon"></i>
+        <h2>Gesture<span>Speak</span></h2>
+        <span class="badge version-badge">v1.0 (Local NLP)</span>
+      </div>
+
+      <div class="engine-status">
+        <div class="status-item">
+          <span class="status-dot green" id="camera-status-dot"></span>
+          <span class="status-text" id="camera-status-text">Camera Active</span>
+        </div>
+        <div class="status-divider">|</div>
+        <div class="status-item">
+          <span class="status-dot pulse-yellow" id="model-status-dot"></span>
+          <span class="status-text" id="model-status-text">Loading Model...</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-toggle-settings" class="icon-btn glass" title="Settings">
+          <i data-lucide="sliders"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Content Workspace -->
+    <div class="workspace-grid">
+      <!-- Left Column: Camera and Real-time Tracking -->
+      <section class="grid-card camera-card glass">
+        <div class="card-header">
+          <h3><i data-lucide="video"></i> Live Vision Stream</h3>
+          <span class="fps-counter" id="fps-counter">0 FPS</span>
+        </div>
+
+        <div class="video-container">
+          <video id="webcam" autoplay playsinline muted></video>
+          <canvas id="canvas-overlay"></canvas>
+
+          <!-- Gesture Confirmation Progress Overlay -->
+          <div class="circular-progress-container" id="progress-container" style="display: none;">
+            <svg class="progress-ring" width="120" height="120">
+              <circle class="progress-ring__circle-bg" stroke="rgba(255,255,255,0.1)" stroke-width="8" fill="transparent" r="50" cx="60" cy="60" />
+              <circle id="progress-ring-circle" class="progress-ring__circle" stroke="url(#gradient-cyan-purple)" stroke-width="8" fill="transparent" r="50" cx="60" cy="60" />
+              <defs>
+                <linearGradient id="gradient-cyan-purple" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#06b6d4" />
+                  <stop offset="100%" stop-color="#a855f7" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="progress-content">
+              <span id="progress-emoji">🖐️</span>
+              <span id="progress-label">Hold</span>
+            </div>
+          </div>
+
+          <!-- Alert/Notification Overlay -->
+          <div class="detection-alert" id="detection-alert" style="display: none;">
+            <i data-lucide="check-circle-2"></i>
+            <span id="detection-alert-text">Added "Hello / Welcome"</span>
+          </div>
+        </div>
+
+        <div class="recognition-footer">
+          <div class="current-detection">
+            <span class="label">Current Gesture:</span>
+            <div class="detected-badge glass" id="active-gesture-badge">
+              <span class="badge-emoji" id="active-emoji">🔍</span>
+              <span class="badge-text" id="active-label">Scanning...</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Sentence Builder and Sentiment (NLP) -->
+      <div class="nlp-controls-column">
+        <!-- Sentence Builder Card -->
+        <section class="grid-card sentence-card glass">
+          <div class="card-header">
+            <h3><i data-lucide="pencil-line"></i> Sentence Builder</h3>
+            <div class="builder-options">
+              <label class="switch-container" title="Read words immediately when added">
+                <span class="switch-label">Auto Speak</span>
+                <input type="checkbox" id="toggle-auto-speak" checked>
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="sentence-box-container">
+            <div id="sentence-display" class="sentence-display empty" contenteditable="true" placeholder="Your gestured words will compile here. You can also type to edit..."></div>
+            <button id="btn-copy" class="icon-btn-text" title="Copy text">
+              <i data-lucide="copy"></i>
+            </button>
+          </div>
+
+          <div class="sentence-actions">
+            <button id="btn-speak" class="btn primary-btn btn-glowing">
+              <i data-lucide="volume-2"></i> Speak Sentence
+            </button>
+            <div class="button-group">
+              <button id="btn-space" class="btn secondary-btn" title="Insert a space">
+                <i data-lucide="space"></i> Space
+              </button>
+              <button id="btn-backspace" class="btn secondary-btn" title="Delete last word">
+                <i data-lucide="delete"></i> Backspace
+              </button>
+              <button id="btn-clear" class="btn danger-btn" title="Clear entire sentence">
+                <i data-lucide="trash-2"></i> Clear
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- NLP Sentiment Analysis Card -->
+        <section class="grid-card sentiment-card glass">
+          <div class="card-header">
+            <h3><i data-lucide="brain-circuit"></i> Sentiment Analysis</h3>
+          </div>
+
+          <div class="sentiment-content">
+            <div class="sentiment-hero">
+              <div class="sentiment-emoji-wrapper" id="sentiment-emoji-wrapper">
+                <span id="sentiment-emoji" class="pulse-slow">😐</span>
+              </div>
+              <div class="sentiment-summary">
+                <span class="sentiment-title" id="sentiment-title">Neutral / Awaiting Input</span>
+                <span class="sentiment-score" id="sentiment-score">Score: 0.0</span>
+              </div>
+            </div>
+
+            <div class="sentiment-bars">
+              <div class="bar-group">
+                <div class="bar-label">
+                  <span>Positive</span>
+                  <span id="pos-pct">33%</span>
+                </div>
+                <div class="bar-track">
+                  <div class="bar-fill positive" id="pos-bar" style="width: 33.3%;"></div>
+                </div>
+              </div>
+
+              <div class="bar-group">
+                <div class="bar-label">
+                  <span>Neutral</span>
+                  <span id="neu-pct">34%</span>
+                </div>
+                <div class="bar-track">
+                  <div class="bar-fill neutral" id="neu-bar" style="width: 33.4%;"></div>
+                </div>
+              </div>
+
+              <div class="bar-group">
+                <div class="bar-label">
+                  <span>Negative</span>
+                  <span id="neg-pct">33%</span>
+                </div>
+                <div class="bar-track">
+                  <div class="bar-fill negative" id="neg-bar" style="width: 33.3%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Bottom Row: Cheat Sheet and Logs -->
+    <div class="bottom-grid">
+      <!-- Dictionary / Cheat Sheet -->
+      <section class="grid-card cheatsheet-card glass">
+        <div class="card-header">
+          <h3><i data-lucide="book-open"></i> Gesture Dictionary</h3>
+        </div>
+        <div class="cheatsheet-grid">
+          <div class="cheat-item glass" data-gesture="open_hand">
+            <div class="cheat-emoji">🖐️</div>
+            <div class="cheat-details">
+              <h4>Open Hand</h4>
+              <p>"Hello / Welcome"</p>
+            </div>
+          </div>
+          <div class="cheat-item glass" data-gesture="thumbs_up">
+            <div class="cheat-emoji">👍</div>
+            <div class="cheat-details">
+              <h4>Thumbs Up</h4>
+              <p>"Yes / Agree / Good"</p>
+            </div>
+          </div>
+          <div class="cheat-item glass" data-gesture="thumbs_down">
+            <div class="cheat-emoji">👎</div>
+            <div class="cheat-details">
+              <h4>Thumbs Down</h4>
+              <p>"No / Disagree / Bad"</p>
+            </div>
+          </div>
+          <div class="cheat-item glass" data-gesture="peace_sign">
+            <div class="cheat-emoji">✌️</div>
+            <div class="cheat-details">
+              <h4>Peace Sign</h4>
+              <p>"Peace / Victory"</p>
+            </div>
+          </div>
+          <div class="cheat-item glass" data-gesture="fist">
+            <div class="cheat-emoji">✊</div>
+            <div class="cheat-details">
+              <h4>Fist</h4>
+              <p>"Stop / Hold on"</p>
+            </div>
+          </div>
+          <div class="cheat-item glass" data-gesture="rock_on">
+            <div class="cheat-emoji">🤘</div>
+            <div class="cheat-details">
+              <h4>Rock On</h4>
+              <p>"Awesome / Rock"</p>
+            </div>
+          </div>
+          <div class="cheat-item glass" data-gesture="pointing_up">
+            <div class="cheat-emoji">☝️</div>
+            <div class="cheat-details">
+              <h4>Pointing Up</h4>
+              <p>"Look / Question"</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Event Logs -->
+      <section class="grid-card logs-card glass">
+        <div class="card-header">
+          <h3><i data-lucide="terminal"></i> Activity Log</h3>
+          <button id="btn-clear-logs" class="icon-btn-text" title="Clear Logs">
+            <i data-lucide="trash"></i>
+          </button>
+        </div>
+        <div class="logs-container" id="logs-feed">
+          <div class="log-entry system">
+            <span class="log-time">[13:00:00]</span>
+            <span class="log-message">GestureSpeak Engine initialized. Awaiting model load.</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Right Drawer Settings -->
+    <aside id="settings-drawer" class="settings-drawer glass">
+      <div class="drawer-header">
+        <h3><i data-lucide="settings"></i> Configuration</h3>
+        <button id="btn-close-settings" class="icon-btn" title="Close Settings">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="drawer-content">
+        <!-- Gesture Settings -->
+        <div class="settings-section">
+          <h4><i data-lucide="hand"></i> Gesture Detection</h4>
+          <div class="setting-item">
+            <div class="setting-label">
+              <span>Lock Holding Time (ms)</span>
+              <span id="val-hold-time">1200</span>
+            </div>
+            <input type="range" id="slider-hold-time" min="500" max="3000" step="100" value="1200">
+            <small>Time you need to hold a gesture to add the word.</small>
+          </div>
+
+          <div class="setting-item">
+            <div class="setting-label">
+              <span>Cooldown Interval (ms)</span>
+              <span id="val-cooldown">2000</span>
+            </div>
+            <input type="range" id="slider-cooldown" min="1000" max="5000" step="250" value="2000">
+            <small>Delay before registering the same gesture again.</small>
+          </div>
+        </div>
+
+        <!-- Vocabulary Customization -->
+        <div class="settings-section">
+          <h4><i data-lucide="book-open"></i> Custom Vocabulary</h4>
+          <div class="vocabulary-editor" id="vocabulary-editor">
+            <!-- Dynamically populated via javascript -->
+          </div>
+          <div class="vocab-btn-group" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+            <button id="btn-save-vocab" class="btn primary-btn btn-glowing" style="padding: 10px; width: 100%; font-size: 0.85rem;">
+              <i data-lucide="save"></i> Save Vocabulary
+            </button>
+            <div style="display: flex; gap: 8px;">
+              <button id="btn-export-vocab" class="btn secondary-btn" style="flex: 1; padding: 10px; font-size: 0.75rem;" title="Export mappings to JSON">
+                <i data-lucide="download"></i> Export
+              </button>
+              <button id="btn-import-vocab-trigger" class="btn secondary-btn" style="flex: 1; padding: 10px; font-size: 0.75rem;" title="Import mappings from JSON">
+                <i data-lucide="upload"></i> Import
+              </button>
+              <input type="file" id="file-import-vocab" accept=".json" style="display: none;">
+            </div>
+            <button id="btn-reset-vocab" class="btn danger-btn" style="padding: 10px; width: 100%; font-size: 0.8rem;">
+              <i data-lucide="refresh-cw"></i> Reset to Defaults
+            </button>
+          </div>
+        </div>
+
+        <!-- Speech Settings -->
+        <div class="settings-section">
+          <h4><i data-lucide="volume-2"></i> Speech Synthesis (TTS)</h4>
+          <div class="setting-item">
+            <label for="select-voice">Voice Select</label>
+            <select id="select-voice" class="glass-select"></select>
+          </div>
+
+          <div class="setting-item">
+            <div class="setting-label">
+              <span>Speech Rate</span>
+              <span id="val-rate">1.0</span>
+            </div>
+            <input type="range" id="slider-rate" min="0.5" max="2.0" step="0.1" value="1.0">
+          </div>
+
+          <div class="setting-item">
+            <div class="setting-label">
+              <span>Pitch</span>
+              <span id="val-pitch">1.0</span>
+            </div>
+            <input type="range" id="slider-pitch" min="0.5" max="2.0" step="0.1" value="1.0">
+          </div>
+
+          <div class="setting-item">
+            <div class="setting-label">
+              <span>Volume</span>
+              <span id="val-volume">1.0</span>
+            </div>
+            <input type="range" id="slider-volume" min="0.0" max="1.0" step="0.1" value="1.0">
+          </div>
+        </div>
+
+        <!-- Camera Mirroring -->
+        <div class="settings-section">
+          <h4><i data-lucide="tv"></i> Display Settings</h4>
+          <div class="setting-item flex-row">
+            <span>Mirror Video Feed</span>
+            <label class="switch-container">
+              <input type="checkbox" id="toggle-mirror" checked>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
